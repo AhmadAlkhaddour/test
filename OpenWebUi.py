@@ -95,7 +95,7 @@ class LLMCodeAnalysisPipeline(Pipeline):
         """Hauptfunktion, die alle Schritte koordiniert."""
         code = user_message  # Eingabe ist der Code
 
-        # Schritt retro: Schritt 1: Strukturanalyse
+        # Schritt 1: Strukturanalyse
         structure = self.analyze_structure(code)
         if "Fehler" in structure:
             return f"Strukturanalyse fehlgeschlagen: {structure}"
