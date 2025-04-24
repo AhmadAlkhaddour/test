@@ -1,18 +1,26 @@
-from pipelines import Pipeline
+from typing import List, Union, Generator
 import requests
-import json
 
-class LLMCodeAnalysisPipeline(Pipeline):
+class LLMCodeAnalysisPipeline:
     def __init__(self):
-        self.type = "pipe"
+        """Initialisiert die Pipeline mit Konfigurationswerten."""
+        self.type = "pipe"  # Typ der Pipeline
         self.valves = {
-            "TASK_MODEL": "llama3.3:70b",  # LLaMA 3.3 70B Modell
-            "API_URL": "http://host.docker.internal:3000/api/chat",  # OpenWebUI API
-            "MAX_TOKENS": 2000  # Max. Tokens für LLM-Antworten
+            "TASK_MODEL": "llama3.3:70b",              # Modellname
+            "API_URL": "http://host.docker.internal:3000/api/chat",  # API-Endpunkt
+            "MAX_TOKENS": 2000                        # Maximale Token-Anzahl
         }
 
-    def call_llm(self, prompt, code):
-        """Sende Prompt an LLaMA 3.3 70B und hole die Antwort."""
+    async def on_startup(self):
+        """Wird beim Serverstart aufgerufen. Hier könnte eine API-Verbindung geprüft werden."""
+        pass  # Für jetzt leer gelassen, kann später erweitert werden
+
+    async def on_shutdown(self):
+        """Wird beim Serverstopp aufgerufen. Hier könnten Ressourcen bereinigt werden."""
+        pass  # Für jetzt leer gelassen
+
+    def call_llm(self, prompt: str, code: str) -> str:
+        """Ruft das LLM über die API auf und gibt die Antwort zurück."""
         headers = {"Content-Type": "application/json"}
         payload = {
             "model": self.valves["TASK_MODEL"],
@@ -38,8 +46,8 @@ class LLMCodeAnalysisPipeline(Pipeline):
         except Exception as e:
             return f"Fehler beim LLM-Aufruf: {str(e)}"
 
-    def analyze_structure(self, code):
-        """LLM analysiert die Struktur des Codes."""
+    def analyze_structure(self, code: str) -> str:
+        """Analysiert die Struktur des Codes."""
         prompt = (
             "Analysiere den folgenden Python-Code und beschreibe seine Struktur. "
             "Liste alle Klassen, Funktionen, globale Variablen und wichtige Importe auf. "
@@ -48,8 +56,8 @@ class LLMCodeAnalysisPipeline(Pipeline):
         )
         return self.call_llm(prompt, code)
 
-    def explain_elements(self, code, structure):
-        """LLM erklärt Variablen und Methoden."""
+    def explain_elements(self, code: str, structure: str) -> str:
+        """Erklärt die Elemente des Codes basierend auf der Struktur."""
         prompt = (
             f"Basiere auf der folgenden Code-Struktur:\n{structure}\n"
             "Erkläre jede Variable und Methode im Code detailliert. Für jede Variable gib an:\n"
@@ -60,8 +68,8 @@ class LLMCodeAnalysisPipeline(Pipeline):
         )
         return self.call_llm(prompt, code)
 
-    def technical_analysis(self, code, structure, explanations):
-        """LLM führt technische Analyse durch."""
+    def technical_analysis(self, code: str, structure: str, explanations: str) -> str:
+        """Führt eine technische Analyse des Codes durch."""
         prompt = (
             f"Basiere auf der folgenden Code-Struktur:\n{structure}\n"
             f"Und den Erklärungen:\n{explanations}\n"
@@ -75,8 +83,8 @@ class LLMCodeAnalysisPipeline(Pipeline):
         )
         return self.call_llm(prompt, code)
 
-    def professional_analysis(self, code, structure, explanations, tech_analysis):
-        """LLM führt professionelle Analyse durch."""
+    def professional_analysis(self, code: str, structure: str, explanations: str, tech_analysis: str) -> str:
+        """Führt eine professionelle Analyse des Codes durch."""
         prompt = (
             f"Basiere auf der folgenden Code-Struktur:\n{structure}\n"
             f"Erklärungen:\n{explanations}\n"
@@ -91,34 +99,48 @@ class LLMCodeAnalysisPipeline(Pipeline):
         )
         return self.call_llm(prompt, code)
 
-    def pipe(self, user_message: str, model_id: str, messages: list, body: dict) -> str:
-        """Hauptfunktion, die alle Schritte koordiniert."""
-        code = user_message  # Eingabe ist der Code
+    def pipe(self, user_message: str, model_id: str, messages: List[dict], body: dict) -> Generator:
+        """
+        Hauptmethode der Pipeline. Analysiert den Code schrittweise und gibt die Ergebnisse als Generator zurück.
+        
+        Args:
+            user_message (str): Der zu analysierende Code.
+            model_id (str): Modell-ID (wird hier nicht verwendet, für Kompatibilität enthalten).
+            messages (List[dict]): Konversationsverlauf (wird hier nicht verwendet).
+            body (dict): Zusätzliche Parameter (wird hier nicht verwendet).
+        
+        Returns:
+            Generator: Liefert die Analyseergebnisse schrittweise.
+        """
+        code = user_message
 
-        # Schritt 1: Strukturanalyse
-        structure = self.analyze_structure(code)
-        if "Fehler" in structure:
-            return f"Strukturanalyse fehlgeschlagen: {structure}"
+        def generate():
+            # Schritt 1: Strukturanalyse
+            structure = self.analyze_structure(code)
+            if "Fehler" in structure:
+                yield f"Strukturanalyse fehlgeschlagen: {structure}"
+                return
+            yield "**Code-Struktur:**\n" + structure + "\n\n"
 
-        # Schritt 2: Variablen/Methoden erklären
-        explanations = self.explain_elements(code, structure)
-        if "Fehler" in explanations:
-            return f"Erklärung fehlgeschlagen: {explanations}"
+            # Schritt 2: Erklärungen
+            explanations = self.explain_elements(code, structure)
+            if "Fehler" in explanations:
+                yield f"Erklärung fehlgeschlagen: {explanations}"
+                return
+            yield "**Erklärungen zu Variablen/Methoden:**\n" + explanations + "\n\n"
 
-        # Schritt 3: Technische Analyse
-        tech_analysis = self.technical_analysis(code, structure, explanations)
-        if "Fehler" in tech_analysis:
-            return f"Technische Analyse fehlgeschlagen: {tech_analysis}"
+            # Schritt 3: Technische Analyse
+            tech_analysis = self.technical_analysis(code, structure, explanations)
+            if "Fehler" in tech_analysis:
+                yield f"Technische Analyse fehlgeschlagen: {tech_analysis}"
+                return
+            yield "**Technische Analyse:**\n" + tech_analysis + "\n\n"
 
-        # Schritt 4: Professionelle Analyse
-        prof_analysis = self.professional_analysis(code, structure, explanations, tech_analysis)
-        if "Fehler" in prof_analysis:
-            return f"Professionelle Analyse fehlgeschlagen: {prof_analysis}"
+            # Schritt 4: Professionelle Analyse
+            prof_analysis = self.professional_analysis(code, structure, explanations, tech_analysis)
+            if "Fehler" in prof_analysis:
+                yield f"Professionelle Analyse fehlgeschlagen: {prof_analysis}"
+                return
+            yield "**Professionelle Analyse:**\n" + prof_analysis
 
-        # Schritt 5: Bericht zusammenstellen
-        return (
-            f"**Code-Struktur:**\n{structure}\n\n"
-            f"**Erklärungen zu Variablen/Methoden:**\n{explanations}\n\n"
-            f"**Technische Analyse:**\n{tech_analysis}\n\n"
-            f"**Professionelle Analyse:**\n{prof_analysis}"
-        )
+        return generate()
