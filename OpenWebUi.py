@@ -5,24 +5,24 @@ import requests
 
 class LLMCodeAnalysisPipeline(Pipeline):
     def __init__(self):
-        """تهيئة الأنبوب مع قيم الإعداد."""
-        self.type = "pipe"  # نوع الأنبوب
+        """Initialisiert die Pipeline mit Konfigurationswerten."""
+        self.type = "pipe"  # Typ der Pipeline
         self.valves = {
-            "TASK_MODEL": "llama3.3:70b",              # اسم النموذج
-            "API_URL": "http://host.docker.internal:3000/api/chat",  # نقطة نهاية الـ API
-            "MAX_TOKENS": 2000                        # الحد الأقصى لعدد الرموز
+            "TASK_MODEL": "llama3.3:70b",              # Modellname
+            "API_URL": "http://host.docker.internal:3000/api/chat",  # API-Endpunkt
+            "MAX_TOKENS": 2000                        # Maximale Anzahl an Tokens
         }
 
     async def on_startup(self):
-        """تُستدعى عند بدء تشغيل الخادم. يمكن التحقق من اتصال الـ API هنا."""
-        pass  # تُركت فارغة حاليًا، يمكن توسعتها لاحقًا
+        """Wird beim Serverstart aufgerufen. Hier könnte die API-Verbindung geprüft werden."""
+        pass  # Derzeit leer, kann später erweitert werden
 
     async def on_shutdown(self):
-        """تُستدعى عند إيقاف الخادم. يمكن تنظيف الموارد هنا."""
-        pass  # تُركت فارغة حاليًا
+        """Wird beim Serverstopp aufgerufen. Hier könnten Ressourcen bereinigt werden."""
+        pass  # Derzeit leer
 
     def call_llm(self, prompt: str, code: str) -> str:
-        """استدعاء النموذج اللغوي عبر الـ API وإرجاع الإجابة."""
+        """Ruft das Sprachmodell über die API auf und gibt die Antwort zurück."""
         headers = {"Content-Type": "application/json"}
         payload = {
             "model": self.valves["TASK_MODEL"],
@@ -30,13 +30,13 @@ class LLMCodeAnalysisPipeline(Pipeline):
                 {
                     "role": "system",
                     "content": (
-                        "أنت خبير في تحليل الأكواد. قم بتحليل كود Python بدقة وأعط إجابات واضحة ومنظمة. "
-                        "أجب فقط عن المهمة المطلوبة وتجنب المعلومات غير الضرورية."
+                        "Du bist ein Experte für Code-Analyse. Analysiere Python-Code präzise und gib klare, strukturierte Antworten. "
+                        "Antworte nur auf die gestellte Aufgabe und vermeide unnötige Informationen."
                     )
                 },
                 {
                     "role": "user",
-                    "content": f"{prompt}\n\n**الكود:**\n```python\n{code}\n```"
+                    "content": f"{prompt}\n\n**Code:**\n```python\n{code}\n```"
                 }
             ],
             "max_tokens": self.valves["MAX_TOKENS"]
@@ -46,103 +46,103 @@ class LLMCodeAnalysisPipeline(Pipeline):
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
         except Exception as e:
-            return f"خطأ في استدعاء النموذج: {str(e)}"
+            return f"Fehler beim Aufruf des Modells: {str(e)}"
 
     def analyze_structure(self, code: str) -> str:
-        """تحليل هيكلية الكود."""
+        """Analysiert die Struktur des Codes."""
         prompt = (
-            "قم بتحليل الكود Python التالي وصف هيكليته. "
-            "قم بإدراج جميع الفئات، الدوال، المتغيرات العامة، والاستيرادات المهمة. "
-            "قدم الإجابة بشكل واضح ومنظم (مثل قائمة أو أقسام). "
-            "مثال:\n- الفئات: الاسم، الوصف\n- الدوال: الاسم، المعاملات\n- المتغيرات العامة: الاسم، النوع"
+            "Analysiere den folgenden Python-Code und beschreibe seine Struktur. "
+            "Liste alle Klassen, Funktionen, globalen Variablen und wichtigen Importe auf. "
+            "Gib die Antwort in einer klaren, strukturierten Form (z. B. als Liste oder Abschnitte). "
+            "Beispiel:\n- Klassen: Name, Beschreibung\n- Funktionen: Name, Parameter\n- Globale Variablen: Name, Typ"
         )
         return self.call_llm(prompt, code)
 
     def explain_elements(self, code: str, structure: str) -> str:
-        """شرح عناصر الكود بناءً على الهيكلية."""
+        """Erklärt die Elemente des Codes basierend auf der Struktur."""
         prompt = (
-            f"استند إلى هيكلية الكود التالية:\n{structure}\n"
-            "اشرح كل متغير ودالة في الكود بالتفصيل. لكل متغير، اذكر:\n"
-            "- الاسم\n- النوع (مثل int، str)\n- الغرض\n- الاستخدام\n"
-            "لكل دالة، اذكر:\n"
-            "- الاسم\n- المعاملات\n- القيمة المُعادة\n- الغرض\n- كيفية استخدامها\n"
-            "قدم الإجابة بشكل واضح، مثل قائمة أو جدول."
+            f"Basiere auf der folgenden Code-Struktur:\n{structure}\n"
+            "Erkläre jede Variable und Funktion im Code detailliert. Für jede Variable gib an:\n"
+            "- Name\n- Typ (z. B. int, str)\n- Zweck\n- Verwendung\n"
+            "Für jede Funktion gib an:\n"
+            "- Name\n- Parameter\n- Rückgabewert\n- Zweck\n- Wie sie verwendet wird\n"
+            "Formatiere die Antwort klar, z. B. als Liste oder Tabelle."
         )
         return self.call_llm(prompt, code)
 
     def technical_analysis(self, code: str, structure: str, explanations: str) -> str:
-        """إجراء تحليل تقني للكود."""
+        """Führt eine technische Analyse des Codes durch."""
         prompt = (
-            f"استند إلى هيكلية الكود التالية:\n{structure}\n"
-            f"والشروحات:\n{explanations}\n"
-            "قم بإجراء تحليل تقني للكود. قيّم:\n"
-            "- القراءة (مثل التسمية، الهيكلية)\n"
-            "- الأداء (مثل الكفاءة، قابلية التوسع)\n"
-            "- قابلية الخطأ (مثل نقص معالجة الأخطاء)\n"
-            "- الجوانب الأمنية (مثل التحقق من المدخلات)\n"
-            "قدم اقتراحات تحسين محددة واشرح أهميتها. "
-            "نظم الإجابة في أقسام لكل فئة."
+            f"Basiere auf der folgenden Code-Struktur:\n{structure}\n"
+            f"Und den Erklärungen:\n{explanations}\n"
+            "Führe eine technische Analyse des Codes durch. Bewerte:\n"
+            "- Lesbarkeit (z. B. Benennung, Struktur)\n"
+            "- Performance (z. B. Effizienz, Skalierbarkeit)\n"
+            "- Fehleranfälligkeit (z. B. fehlende Fehlerbehandlung)\n"
+            "- Sicherheitsaspekte (z. B. Eingabevalidierung)\n"
+            "Gib konkrete Verbesserungsvorschläge und erkläre, warum sie wichtig sind. "
+            "Formatiere die Antwort in Abschnitten für jede Kategorie."
         )
         return self.call_llm(prompt, code)
 
     def professional_analysis(self, code: str, structure: str, explanations: str, tech_analysis: str) -> str:
-        """إجراء تحليل احترافي للكود."""
+        """Führt eine professionelle Analyse des Codes durch."""
         prompt = (
-            f"استند إلى هيكلية الكود التالية:\n{structure}\n"
-            f"الشروحات:\n{explanations}\n"
-            f"التحليل التقني:\n{tech_analysis}\n"
-            "قم بإجراء تحليل احترافي. قيّم:\n"
-            "- الصيانة (مثل الوحدات، التوثيق)\n"
-            "- قابلية التوسع (مثل ملاءمة المشاريع الكبيرة)\n"
-            "- الملاءمة للغرض (هل يحقق الكود المتطلبات؟)\n"
-            "- التوافق مع أفضل الممارسات (مثل PEP 8 لـ Python)\n"
-            "قدم توصيات لتحسين الكود وقارنه بمعايير الصناعة. "
-            "نظم الإجابة في أقسام واضحة."
+            f"Basiere auf der folgenden Code-Struktur:\n{structure}\n"
+            f"Erklärungen:\n{explanations}\n"
+            f"Technische Analyse:\n{tech_analysis}\n"
+            "Führe eine professionelle Analyse durch. Bewerte:\n"
+            "- Wartbarkeit (z. B. Modularität, Dokumentation)\n"
+            "- Skalierbarkeit (z. B. Eignung für größere Projekte)\n"
+            "- Eignung für den Zweck (z. B. Erfüllt der Code die Anforderungen?)\n"
+            "- Übereinstimmung mit Best Practices (z. B. PEP 8 für Python)\n"
+            "Gib Empfehlungen, wie der Code verbessert werden kann, und vergleiche ihn mit Industriestandards. "
+            "Formatiere die Antwort in klaren Abschnitten."
         )
         return self.call_llm(prompt, code)
 
     def pipe(self, user_message: str, model_id: str, messages: List[dict], body: dict) -> Generator:
         """
-        الدالة الرئيسية للأنبوب. تحلل الكود خطوة بخطوة وتُرجع النتائج كمولد.
+        Hauptmethode der Pipeline. Analysiert den Code schrittweise und gibt die Ergebnisse als Generator zurück.
 
-        الوسائط:
-            user_message (str): الكود المراد تحليله.
-            model_id (str): معرف النموذج (غير مستخدم هنا، مضاف للتوافق).
-            messages (List[dict]): سجل المحادثة (غير مستخدم هنا).
-            body (dict): معلمات إضافية (غير مستخدمة هنا).
+        Args:
+            user_message (str): Der zu analysierende Code.
+            model_id (str): Modell-ID (wird hier nicht verwendet, für Kompatibilität enthalten).
+            messages (List[dict]): Konversationsverlauf (wird hier nicht verwendet).
+            body (dict): Zusätzliche Parameter (wird hier nicht verwendet).
 
-        الإرجاع:
-            Generator: يُرجع نتائج التحليل خطوة بخطوة.
+        Returns:
+            Generator: Liefert die Analyseergebnisse schrittweise.
         """
         code = user_message
 
         def generate():
-            # الخطوة 1: تحليل الهيكلية
+            # Schritt 1: Strukturanalyse
             structure = self.analyze_structure(code)
-            if "خطأ" in structure:
-                yield f"فشل تحليل الهيكلية: {structure}"
+            if "Fehler" in structure:
+                yield f"Strukturanalyse fehlgeschlagen: {structure}"
                 return
-            yield "**هيكلية الكود:**\n" + structure + "\n\n"
+            yield "**Code-Struktur:**\n" + structure + "\n\n"
 
-            # الخطوة 2: الشروحات
+            # Schritt 2: Erklärungen
             explanations = self.explain_elements(code, structure)
-            if "خطأ" in explanations:
-                yield f"فشل الشرح: {explanations}"
+            if "Fehler" in explanations:
+                yield f"Erklärung fehlgeschlagen: {explanations}"
                 return
-            yield "**شروحات المتغيرات/الدوال:**\n" + explanations + "\n\n"
+            yield "**Erklärungen zu Variablen/Funktionen:**\n" + explanations + "\n\n"
 
-            # الخطوة 3: التحليل التقني
+            # Schritt 3: Technische Analyse
             tech_analysis = self.technical_analysis(code, structure, explanations)
-            if "خطأ" in tech_analysis:
-                yield f"فشل التحليل التقني: {tech_analysis}"
+            if "Fehler" in tech_analysis:
+                yield f"Technische Analyse fehlgeschlagen: {tech_analysis}"
                 return
-            yield "**التحليل التقني:**\n" + tech_analysis + "\n\n"
+            yield "**Technische Analyse:**\n" + tech_analysis + "\n\n"
 
-            # الخطوة 4: التحليل الاحترافي
+            # Schritt 4: Professionelle Analyse
             prof_analysis = self.professional_analysis(code, structure, explanations, tech_analysis)
-            if "خطأ" in prof_analysis:
-                yield f"فشل التحليل الاحترافي: {prof_analysis}"
+            if "Fehler" in prof_analysis:
+                yield f"Professionelle Analyse fehlgeschlagen: {prof_analysis}"
                 return
-            yield "**التحليل الاحترافي:**\n" + prof_analysis
+            yield "**Professionelle Analyse:**\n" + prof_analysis
 
         return generate()
