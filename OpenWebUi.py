@@ -1,7 +1,3 @@
----
-requirements: requests
----
-
 from pipelines import Pipeline
 import requests
 import json
