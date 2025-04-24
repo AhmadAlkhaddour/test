@@ -1,42 +1,31 @@
-"""
-title: LLM Code Analysis Pipeline
-author: Ahmad Alkhaddour
-date: 2025-04-24
-version: 1.0
-license: MIT
-description: Eine Pipeline zur Analyse von Python-Code mit einem großen Sprachmodell (LLM), das Struktur, Elemente, technische und professionelle Aspekte bewertet.
-requirements: requests
-"""
-
-from typing import List, Union, Generator, Iterator
-from pipelines import Pipeline
+# dependencies: requests
+from typing import List, Union, Generator
+from openwebui.pipelines import Pipeline  # Korrigierter Import
 import requests
 
 class LLMCodeAnalysisPipeline(Pipeline):
     def __init__(self):
         """Initialisiert die Pipeline mit Konfigurationswerten."""
-        self.model = None
-        self.api_url = None
-        self.max_tokens = None
+        self.type = "pipe"  # Typ der Pipeline
+        self.valves = {
+            "TASK_MODEL": "llama3.3:70b",              # Modellname
+            "API_URL": "http://host.docker.internal:3000/api/chat",  # API-Endpunkt
+            "MAX_TOKENS": 2000                        # Maximale Anzahl an Tokens
+        }
 
     async def on_startup(self):
-        """Wird beim Serverstart aufgerufen. Initialisiert die Konfiguration."""
-        self.model = "llama3.3:70b"  # Modellname
-        self.api_url = "http://host.docker.internal:3000/api/chat"  # API-Endpunkt
-        self.max_tokens = 2000  # Maximale Anzahl an Tokens
-        # Diese Funktion wird beim Serverstart aufgerufen
-        pass
+        """Wird beim Serverstart aufgerufen. Hier könnte die API-Verbindung geprüft werden."""
+        pass  # Derzeit leer, kann später erweitert werden
 
     async def on_shutdown(self):
         """Wird beim Serverstopp aufgerufen. Hier könnten Ressourcen bereinigt werden."""
-        # Diese Funktion wird beim Serverstopp aufgerufen
-        pass
+        pass  # Derzeit leer
 
     def call_llm(self, prompt: str, code: str) -> str:
         """Ruft das Sprachmodell über die API auf und gibt die Antwort zurück."""
         headers = {"Content-Type": "application/json"}
         payload = {
-            "model": self.model,
+            "model": self.valves["TASK_MODEL"],
             "messages": [
                 {
                     "role": "system",
@@ -50,10 +39,10 @@ class LLMCodeAnalysisPipeline(Pipeline):
                     "content": f"{prompt}\n\n**Code:**\n```python\n{code}\n```"
                 }
             ],
-            "max_tokens": self.max_tokens
+            "max_tokens": self.valves["MAX_TOKENS"]
         }
         try:
-            response = requests.post(self.api_url, headers=headers, json=payload)
+            response = requests.post(self.valves["API_URL"], headers=headers, json=payload)
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
         except Exception as e:
@@ -112,7 +101,7 @@ class LLMCodeAnalysisPipeline(Pipeline):
         )
         return self.call_llm(prompt, code)
 
-    def pipe(self, user_message: str, model_id: str, messages: List[dict], body: dict) -> Union[str, Generator, Iterator]:
+    def pipe(self, user_message: str, model_id: str, messages: List[dict], body: dict) -> Generator:
         """
         Hauptmethode der Pipeline. Analysiert den Code schrittweise und gibt die Ergebnisse als Generator zurück.
 
@@ -126,8 +115,6 @@ class LLMCodeAnalysisPipeline(Pipeline):
             Generator: Liefert die Analyseergebnisse schrittweise.
         """
         code = user_message
-        print(messages)
-        print(user_message)
 
         def generate():
             # Schritt 1: Strukturanalyse
